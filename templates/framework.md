@@ -1,103 +1,86 @@
-# Framework Bridge (auto-detect, pcall-safe)
+# Framework Bridge (one file per framework, unified API)
 
-Generate one bridge that supports ESX, QBCore, QBox(ox_core), ND_Core, standalone. Auto-detect by resource state; never hard-fail.
+Use this only when the resource targets a framework (ESX/QBCore/Qbox). A pure standalone
+resource has no framework bridge — it uses native APIs and its own data.
 
-## server/framework.lua
+Pattern: detect the framework ONCE, load the matching module, expose ONE unified API. No
+`if FW == 'esx' then … elseif` scattered across every function. Lives in `shared/bridge/`.
+
+## Detection (once)
 
 ```lua
-Framework, FW = nil, nil
+-- shared/bridge/init.lua
+local framework =
+    GetResourceState('es_extended') == 'started' and 'esx' or
+    GetResourceState('qb-core') == 'started' and 'qb' or
+    GetResourceState('ox_core') == 'started' and 'qbox' or
+    GetResourceState('ND_Core') == 'started' and 'nd' or 'standalone'
 
-CreateThread(function()
-    if GetResourceState('es_extended') == 'started' then
-        FW = 'esx'
-        Framework = exports['es_extended']:getSharedObject()
-    elseif GetResourceState('qb-core') == 'started' then
-        FW = 'qb'
-        Framework = exports['qb-core']:GetCoreObject()
-    elseif GetResourceState('ox_core') == 'started' then
-        FW = 'ox'
-    elseif GetResourceState('ND_Core') == 'started' then
-        FW = 'nd'
+if framework == 'standalone' then
+    lib.print.warn('no framework detected; running standalone')
+end
+
+shared.framework = framework
+return require(('shared.bridge.%s'):format(framework))
+```
+
+## Unified contract (every framework implements it)
+
+```lua
+---@class Bridge
+---@field getPlayer fun(src: number): table?
+---@field getIdentifier fun(src: number): string?
+---@field getMoney fun(src: number, account: 'cash'|'bank'): number
+---@field addMoney fun(src: number, account: string, amount: number): boolean
+---@field removeMoney fun(src: number, account: string, amount: number): boolean
+---@field getJob fun(src: number): string, number
+---@field hasGroup fun(src: number, group: string|table): string?, number?
+---@field giveItem fun(src: number, item: string, count: number): boolean
+```
+
+## One impl per framework (isolated)
+
+```lua
+-- shared/bridge/esx.lua
+local ESX = exports.es_extended:getSharedObject()
+local bridge = {}
+
+function bridge.getMoney(src, account)
+    local x = ESX.GetPlayerFromId(src)
+    if not x then return 0 end
+    return account == 'bank' and (x.getAccount('bank').money or 0) or x.getMoney()
+end
+
+function bridge.removeMoney(src, account, amount)
+    if type(amount) ~= 'number' or amount ~= amount or amount <= 0 then return false end
+    local x = ESX.GetPlayerFromId(src); if not x then return false end
+    if account == 'bank' then
+        if (x.getAccount('bank').money or 0) < amount then return false end
+        x.removeAccountMoney('bank', amount)
     else
-        FW = 'standalone'
+        if x.getMoney() < amount then return false end
+        x.removeMoney(amount)
     end
-end)
-
--- Resolve a player object from a SERVER source (never a client-sent id)
-function GetPlayer(src)
-    if FW == 'esx' then return Framework.GetPlayerFromId(src)
-    elseif FW == 'qb' then return Framework.Functions.GetPlayer(src)
-    elseif FW == 'ox' then return exports.ox_core:GetPlayer(src) end
-    return nil
+    return true
 end
-
--- Money: returns true on success, server-authoritative amount
-function RemoveMoney(src, amount, account)
-    if type(amount) ~= 'number' or amount <= 0 or amount ~= amount then return false end
-    local p = GetPlayer(src); if not p then return false end
-    if FW == 'esx' then
-        if p.getMoney() < amount and account ~= 'bank' then return false end
-        p.removeMoney(amount); return true
-    elseif FW == 'qb' then
-        return p.Functions.RemoveMoney(account or 'cash', amount)
-    end
-    return false
-end
-
-function AddMoney(src, amount, account)
-    if type(amount) ~= 'number' or amount <= 0 then return false end
-    local p = GetPlayer(src); if not p then return false end
-    if FW == 'esx' then p.addMoney(amount); return true
-    elseif FW == 'qb' then return p.Functions.AddMoney(account or 'cash', amount) end
-    return false
-end
+-- ... rest of the contract
+return bridge
 ```
 
-## client/framework.lua
+`shared/bridge/qb.lua`, `qbox.lua`, `nd.lua` implement the same contract.
+
+## Usage from anywhere
 
 ```lua
-Framework, FW = nil, nil
-
-CreateThread(function()
-    if GetResourceState('es_extended') == 'started' then
-        FW = 'esx'; Framework = exports['es_extended']:getSharedObject()
-    elseif GetResourceState('qb-core') == 'started' then
-        FW = 'qb'; Framework = exports['qb-core']:GetCoreObject()
-    end
-end)
+local Framework = require 'shared.bridge'
+Framework.removeMoney(src, 'bank', total)     -- identical across ESX/QB/qbox
 ```
 
-## Notify helper (prefers ox_lib / dei_notifys, falls back per framework)
+Why: framework logic in ONE file each; adding a framework = one new file matching the
+contract, zero changes in resources; every signature takes `src` (server-resolved) — the
+bridge never accepts a client-sent id.
 
-```lua
-function Notify(msg, type)
-    if GetResourceState('ox_lib') == 'started' then
-        lib.notify({ description = msg, type = type or 'inform' })
-    elseif GetResourceState('dei_notifys') == 'started' then
-        exports['dei_notifys']:Notify(msg, type or 'info')
-    elseif FW == 'qb' and Framework then
-        Framework.Functions.Notify(msg, type or 'primary')
-    elseif FW == 'esx' and Framework then
-        Framework.ShowNotification(msg)
-    else
-        BeginTextCommandThefeedPost('STRING'); AddTextComponentSubstringPlayerName(msg)
-        EndTextCommandThefeedPostTicker(false, true)
-    end
-end
-```
-
-## server/framework.lua — DB wrapper (oxmysql, pcall-safe)
-
-```lua
-function dbExecute(query, params, cb)
-    local ok = pcall(function() exports.oxmysql:execute(query, params, cb) end)
-    if not ok and cb then cb(0) end
-end
-
-function dbQuery(query, params, cb)
-    local ok = pcall(function() exports.oxmysql:execute(query, params, cb) end)
-    if not ok and cb then cb({}) end
-end
-```
-
-CRITICAL: every wrapper validates input and uses the SERVER source. Never accept a player id from the client.
+## Notify
+One helper, not per-framework notify code. Use `lib.notify` if the project has ox_lib,
+the framework's notify (`ESX.ShowNotification`, `QBCore ... Notify`) on a framework, or a
+native `BeginTextCommandThefeedPost` fallback when standalone.

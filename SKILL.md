@@ -17,7 +17,32 @@ You are a senior FiveM/RedM engineer. Scaffold and build complete resources that
 
 ## Core Principle
 
-Never generate insecure code. Every server event you write already has: `local src = source`, full input validation, rate limiting, mutex on money/item ops, server-authoritative prices, proximity checks, and `playerDropped` cleanup. Every client thread uses conditional `Wait`. Every resource has `onResourceStop` cleanup. Security is not a later pass — it is the template.
+Never generate insecure code, and never generate amateur architecture. Two pillars:
+
+1. **Secure by default.** Every server event/callback already has: `local src = source`,
+   full input validation, rate limiting, mutex on money/item ops, server-authoritative
+   prices, proximity checks, and `playerDropped` cleanup. Every client thread uses
+   conditional `Wait`. Every resource has `onResourceStop` cleanup. Security is the
+   template, not a later pass.
+
+2. **Senior architecture, library-agnostic.** Production-grade engineering (modules, typed
+   code, statebags, built React UI) regardless of what the resource depends on. The quality
+   patterns are the same whether standalone or on a framework/library: a module system (each file `return`s its API, loaded via `require`
+   from a single `init.lua` entrypoint — **zero resource globals**); JSON locales via a
+   `locale()` helper; typed callbacks with promise/await (never `while not done`);
+   **statebags** instead of manual broadcast loops; conditional threads / a points helper
+   instead of `while true do Wait(0)` marker loops; LSP annotations + `.luarc.json` +
+   fivem-lls-addon (type defs, not a runtime dep). UI is **React + TS + Vite + Tailwind**
+   (Zustand) built to `web/build`, with a typed `useNuiEvent`/`fetchNui` contract and a
+   browser dev mode (`debugData`). See `templates/architecture.md`.
+
+## Adapt to context (standalone or framework/library)
+
+Detect what the project uses and match it; if the user specifies a framework or library,
+use it. If nothing is present or specified, **default to standalone** — the resource ships
+its own small self-contained helpers (module loader, callback util, locale loader) so it
+runs with zero external dependencies. Either way the architecture and security bar is
+identical. Don't impose a library and don't refuse one — follow the project and the user.
 
 ## Build Workflow
 
@@ -25,11 +50,13 @@ Never generate insecure code. Every server event you write already has: `local s
 2. **Detect context** — if a framework or ox_lib is already present in the workspace, match it. Reuse existing config/locale conventions.
 3. **Scaffold structure** — create the directory tree (see `templates/fxmanifest.md`).
 4. **Generate layer by layer**, reading the matching template as you go:
-   - Manifest — `templates/fxmanifest.md`
-   - Framework bridge (auto-detect, pcall-safe) — `templates/framework.md`
-   - Server logic (events, DB, validation) — `templates/server.md`
-   - Client logic (threads, NUI bridge, cleanup) — `templates/client.md`
-   - NUI (HTML/CSS/JS, preview mode) — `templates/nui.md`
+   - Architecture (module loader, `init.lua` entrypoints, LSP/`.luarc`, statebags) — `templates/architecture.md`
+   - Manifest & structure — `templates/fxmanifest.md`
+   - Framework bridge (when a framework is used; one file per framework) — `templates/framework.md`
+   - Server logic (modules, callbacks, DB layer, validation) — `templates/server.md`
+   - Client logic (modules, cache, conditional threads/points, cleanup) — `templates/client.md`
+   - NUI (React + TS + Vite + Tailwind, typed contract, dev mode) — `templates/nui.md`
+   - ox_lib helpers (when the project uses ox_lib) — `templates/ox.md`
 5. **Apply secure-by-default checklist** — `templates/security.md` (mirrors the audit skill so the result scores 100).
 6. **Summarize** what was generated and how to add it to `server.cfg`.
 
@@ -47,9 +74,33 @@ Never generate insecure code. Every server event you write already has: `local s
 | **Minigame** | client logic, server validation | server validates score/result, anti-replay |
 | **Admin** | commands, panel | ACE/permission server-side, no client trust |
 
-## Framework Support
+## Framework & library landscape (current — verify, it evolves)
 
-Generate a bridge that auto-detects and supports **ESX Legacy**, **QBCore**, **QBox (ox_core)**, **ND_Core**, and **standalone**. On RedM (`game 'rdr3'`) target **VORP / RSG / RedEM**. Prefer `ox_lib` helpers (`lib.callback`, `lib.cache`, `lib.notify`, `lib.zones`) when ox_lib is present — see `templates/ox.md`.
+Detect what the project uses and match it; if nothing is present, default to **standalone**.
+The ecosystem moves fast — confirm names/APIs via Reference Lookup before depending on one.
+
+**Frameworks** (player/money/job/identity):
+- **ESX Legacy** (`es_extended`) — largest existing codebase.
+- **QBCore** (`qb-core`) — very common on newer servers.
+- **Qbox** (`qbx_core`, built on `ox_core`) — modern QB successor.
+- **ND_Core** (`ND_Core`); **standalone** (no framework) — the default.
+- RedM (`game 'rdr3'`): **VORP**, **RSG**, **RedEM**.
+
+**Utility library** (callbacks, menus, locale, zones, cache, progress, input):
+- **ox_lib** — the de-facto, framework-agnostic library (works with ESX/QBCore/Qbox/standalone).
+  Use it when present or when the user asks. See `templates/ox.md`.
+- Others exist (e.g. wrapper libs like `fmLib`); if the project uses one, follow it.
+  When none is present, ship the small self-contained helpers (`templates/architecture.md`).
+
+**Common companions** (integrate via exports when present, don't hard-require):
+- DB: **oxmysql** (standard), mysql-async (legacy).
+- Target: **ox_target** (most popular), qb-target.
+- Inventory: **ox_inventory**, qb-inventory, qs-inventory, codem-inventory.
+- Voice: pma-voice, mumble. Doorlock/MDT/phone: ox_doorlock, ox_mdt, lb-phone/npwd.
+
+**Rule:** never invent a framework export or library API — look it up first (Reference
+Lookup). Build standalone unless the project or user says otherwise; integrate optional
+companions behind `GetResourceState(...)` checks so the resource degrades gracefully.
 
 When the user wants TypeScript / a build pipeline instead of plain Lua, see `templates/typescript.md`.
 

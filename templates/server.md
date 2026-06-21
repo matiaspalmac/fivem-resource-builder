@@ -1,95 +1,115 @@
-# Secure Server Patterns
+# Secure Server Patterns (modules + callbacks + secure-by-default)
 
-Every server event you generate uses this skeleton. Do not emit a "naked" event.
+Server code is organized as modules (`return` their API, loaded from `server/init.lua`).
+Every event/callback is validated, rate-limited, and server-authoritative. Async uses
+promises, never `while not done`.
 
-## Event skeleton (validation + rate limit)
+> **Callbacks:** the `callback` API below comes from ox_lib (`lib.callback`) when the
+> project has it. **Standalone**, ship a tiny equivalent (`shared/callback.lua`, ~40 lines:
+> client `TriggerServerEvent` + a pending-promise table keyed by a random id, server
+> responds via `TriggerClientEvent`) exposing the same `callback.register` / `callback.await`.
+> Same shape either way. A plain `RegisterNetEvent` is fine for true fire-and-forget.
+
+## Module + callback skeleton (the default)
 
 ```lua
-local cooldowns = {}
+-- server/shop.lua
+local Framework = require 'shared.bridge'    -- only if targeting a framework
+local callback  = require 'shared.callback'  -- standalone util, or ox_lib's lib.callback
+local locks, cooldowns = {}, {}
+
 local function rateLimit(src, action, seconds)
-    local key = src .. ':' .. action
+    local key = ('%s:%s'):format(src, action)
     local now = os.time()
     if cooldowns[key] and now - cooldowns[key] < seconds then return false end
     cooldowns[key] = now
     return true
 end
 
-RegisterNetEvent('resource:action', function(arg)
-    local src = source                                   -- ALWAYS server source
-    if not rateLimit(src, 'action', 2) then return end
-    if type(arg) ~= 'string' or #arg > 32 then return end -- type + length guard
-    -- ... logic
+-- callback: `source` is injected server-side; never trust a client id
+callback.register('shop:buy', function(source, itemId, qty)
+    local src = source
+    if not rateLimit(src, 'buy', 1) then return false end
+    if type(itemId) ~= 'string' or #itemId > 32 then return false end
+    if type(qty) ~= 'number' or qty ~= qty or qty < 1 or qty > Config.MaxQty then return false end
+    qty = math.floor(qty)
+
+    if locks[src] then return false end                 -- mutex (anti race/dupe)
+    locks[src] = true
+
+    local item = Config.Items[itemId]                   -- server-authoritative price
+    if not item then locks[src] = nil return false end
+
+    local ped = GetPlayerPed(src)                       -- proximity (never trust client coords)
+    if ped == 0 or #(GetEntityCoords(ped) - Config.ShopCoords) > 5.0 then
+        locks[src] = nil return false
+    end
+
+    local total = item.price * qty
+    if not Framework.removeMoney(src, 'bank', total) then locks[src] = nil return false end
+    Framework.giveItem(src, itemId, qty)                -- atomic: deduct then give
+    locks[src] = nil
+    return true
 end)
 
 AddEventHandler('playerDropped', function()
     local src = source
+    locks[src] = nil
     for key in pairs(cooldowns) do
         if key:find('^' .. src .. ':') then cooldowns[key] = nil end
     end
 end)
+
+return true
 ```
 
-Server-only internal events: use `AddEventHandler`, or guard `if source ~= 65535 then return end`.
+Why callbacks over net events here: a callback is promise-based, validated (unregistered
+names rejected), `pcall`-wrapped (a handler error won't crash), and the client gets a typed
+response. Use a plain `RegisterNetEvent` only for true fire-and-forget; still
+`local src = source` + validate.
 
-## Money/item op (mutex + server-authoritative price)
+Server-only internal events: guard `if source ~= 65535 then return end`.
 
-```lua
-local locks = {}
-
-RegisterNetEvent('shop:buy', function(itemId, qty)
-    local src = source
-    if not rateLimit(src, 'buy', 1) then return end
-    if type(itemId) ~= 'string' then return end
-    if type(qty) ~= 'number' or qty ~= qty then return end
-    qty = math.floor(qty)
-    if qty < 1 or qty > Config.MaxQty then return end     -- range + negative reject
-
-    if locks[src] then return end                          -- mutex (anti race/dupe)
-    locks[src] = true
-
-    local item = Config.Items[itemId]                      -- price from server config
-    if not item then locks[src] = nil return end
-
-    -- proximity (never trust client coords)
-    local ped = GetPlayerPed(src)
-    if ped == 0 or #(GetEntityCoords(ped) - Config.ShopCoords) > 5.0 then
-        locks[src] = nil return
-    end
-
-    local total = item.price * qty
-    if not RemoveMoney(src, total, 'cash') then locks[src] = nil return end  -- balance checked inside
-    GivePlayerItem(src, itemId, qty)                       -- atomic: deduct then give
-    locks[src] = nil
-end)
-
-AddEventHandler('playerDropped', function() locks[source] = nil end)
-```
-
-## DB access (parameterized only)
+## DB layer (module, parameterized, non-blocking)
 
 ```lua
--- GOOD
-exports.oxmysql:execute('SELECT * FROM owned_vehicles WHERE owner = ?', { identifier }, cb)
--- NEVER: string concatenation / string.format into SQL
-```
+-- server/storage.lua
+local storage = {}
 
-## Permissions / admin
-
-```lua
-local function isAdmin(src)
-    return IsPlayerAceAllowed(src, 'command.myadmin')  -- ACE, server-side
+---@param identifier string
+---@return table[]
+function storage.getBills(identifier)
+    -- .await suspends THIS coroutine, not the main thread (oxmysql = promises)
+    return MySQL.query.await('SELECT * FROM bills WHERE target_id = ? ORDER BY created_at DESC',
+        { identifier }) or {}
 end
--- check isAdmin(src) BEFORE any privileged action; never trust a client "isAdmin" flag
+
+function storage.addBill(bill)
+    return MySQL.insert.await('INSERT INTO bills (target_id, amount) VALUES (?, ?)',
+        { bill.target, bill.amount })
+end
+
+return storage
+```
+- Parameterized always (`?`/`:named`) — never concatenation (SQLi).
+- No N+1 (`WHERE id IN (?)` / JOIN). `LIMIT` clamped from input. Index filter columns.
+- Business logic calls `storage.*`; no inline SQL scattered around.
+
+## Permissions / admin (server-side, ACE/bridge)
+```lua
+if not Framework.hasGroup(src, { admin = 0 }) then return end
+-- or: if not IsPlayerAceAllowed(src, 'command.myadmin') then return end
 ```
 
-## Startup message
-
+## Startup
 ```lua
 CreateThread(function()
-    Wait(500)
-    local v = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '1.0'
-    print(('^4[Dei]^0 %s v%s - ^2Iniciado^0'):format(GetCurrentResourceName(), v))
+    if not lib.checkDependency('oxmysql', '2.4.0') then return end
+    local v = GetResourceMetadata(cache.resource, 'version', 0) or '1.0'
+    lib.print.info(('%s v%s started'):format(cache.resource, v))
 end)
 ```
 
-Hard rules: source from `source`, validate every param (type/range/length/NaN), rate limit every net event, mutex every money/item op, prices server-side, proximity for world actions, clean every source-keyed table in `playerDropped`.
+Hard rules: `source` server-resolved; validate every param (type/range/length/NaN);
+rate-limit every event/callback; mutex every money/item op; prices server-side; proximity
+for world actions; clean source-keyed tables in `playerDropped`; parameterized SQL only.
