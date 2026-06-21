@@ -1,6 +1,7 @@
 # FiveM Resource Builder
 
 [![npm](https://img.shields.io/npm/v/fivem-resource-builder)](https://www.npmjs.com/package/fivem-resource-builder)
+[![downloads](https://img.shields.io/npm/dm/fivem-resource-builder)](https://www.npmjs.com/package/fivem-resource-builder)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A Claude Code skill that scaffolds full FiveM and RedM resources with the security already in place. Ask for a shop, a garage, a job, a HUD; you get a working resource where every server event validates input, every price lives on the server, and nothing trusts the client.
