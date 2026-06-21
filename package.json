@@ -1,7 +1,7 @@
 {
   "name": "fivem-resource-builder",
   "version": "1.0.0",
-  "description": "Claude Code skill that scaffolds and builds complete, secure-by-default FiveM/RedM resources — fxmanifest, framework bridge (ESX, QBCore, QBox, ND_Core), server/client logic, NUI, and database wiring with validation, rate limiting, anti-dupe, and cleanup baked in. Pairs with fivem-security-audit. Optimized for Opus 4.8.",
+  "description": "Claude Code skill that scaffolds secure FiveM and RedM resources for ESX, QBCore, QBox, ox and NUI, with validation, rate limiting, anti-dupe and cleanup baked in.",
   "keywords": [
     "fivem",
     "fivem-resource-builder",

@@ -1,53 +1,63 @@
-# FiveM Resource Builder Skill for Claude Code
+# FiveM Resource Builder
 
-[![npm version](https://img.shields.io/npm/v/fivem-resource-builder)](https://www.npmjs.com/package/fivem-resource-builder)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![npm](https://img.shields.io/npm/v/fivem-resource-builder)](https://www.npmjs.com/package/fivem-resource-builder)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Scaffold and build complete, **secure-by-default** FiveM/RedM resources. The counterpart to [fivem-security-audit](https://github.com/matiaspalmac/fivem-security-audit): one builds, the other verifies. Optimized for Claude Opus 4.8.
-
-## Install
+A Claude Code skill that scaffolds full FiveM and RedM resources with the security already in place. Ask for a shop, a garage, a job, a HUD; you get a working resource where every server event validates input, every price lives on the server, and nothing trusts the client.
 
 ```bash
 npx fivem-resource-builder
 ```
 
-Restart Claude Code, then `/fivem-resource-builder` or just ask: "create a QBCore shop resource".
+Restart Claude Code, then `/fivem-resource-builder` or just say what you want:
 
-**Uninstall:** `npx fivem-resource-builder --uninstall`
+> "create a QBCore shop with a NUI"
+> "scaffold an ESX garage"
+> "add a secure buy event to this resource"
 
-## What it does
+## Why it's different
 
-Generates full resources where security is the template, not an afterthought. Every server event ships with `local src = source`, input validation, rate limiting, anti-dupe mutex, server-authoritative prices, proximity checks, and `playerDropped` cleanup. Every client thread is conditional. Every NUI is XSS-safe with a preview mode.
+Most generators hand you an empty skeleton and wish you luck. This one writes the parts people get wrong:
 
-### Layers generated
-- **Manifest & structure** — `cerulean`, `lua54`, no wildcards, declared deps
-- **Framework bridge** — auto-detect ESX / QBCore / QBox(ox_core) / ND_Core / standalone (RedM: VORP / RSG / RedEM)
-- **Server logic** — secure event skeletons, parameterized DB, ACE permissions
-- **Client logic** — two-tier threads, native caching, full `onResourceStop`
-- **NUI** — `textContent` XSS-safe, intent-only callbacks, CSP, `IS_BROWSER` preview
-- **ox ecosystem** — `lib.callback`, `ox_target`, `ox_inventory` hooks, `lib.points`, `lib.addCommand`, `lib.locale`
-- **TypeScript option** — esbuild/Vite build, typed natives, HMR for NUI
+- `source` resolved on the server, never sent by the client
+- Input validated for type, range, length and NaN
+- Rate limits and anti-dupe mutexes on money and item events
+- Prices read from server config, not from the NUI
+- Proximity checks on world actions
+- `playerDropped` and `onResourceStop` cleanup, every time
+- NUI that escapes user text and ships a browser preview mode
 
-### Live reference lookup (no guessing)
-Fetches current natives from `docs.fivem.net`, framework APIs (ESX/QBCore/QBox/ox), and model/prop hashes (PlebMasters Forge) instead of hallucinating signatures. Uses Context7 for library docs.
+The output is built to pass the audit (below) on the first run.
 
-### Resource types
-shop / economy · job · garage · inventory · HUD / menu · minigame · admin
+## What you get
 
-## Dei FiveM Toolkit — build → audit → protect
+| Layer | What it generates |
+|-------|-------------------|
+| Manifest | `cerulean`, `lua54`, explicit file list, declared dependencies |
+| Framework | auto-detect bridge for ESX, QBCore, QBox (ox_core), ND_Core, standalone |
+| Server | validated events, parameterized SQL, ACE permissions |
+| Client | two-tier threads, cached natives, full cleanup |
+| NUI | XSS-safe rendering, intent-only callbacks, CSP, preview mode |
+| ox | `lib.callback`, `ox_target`, `ox_inventory` hooks, `lib.points`, `lib.locale` |
+| TypeScript | optional esbuild/Vite build with typed natives and NUI hot reload |
+| CI | luacheck GitHub Action and `.luacheckrc` tuned for Cfx globals |
 
-| Stage | Tool | Role |
-|-------|------|------|
-| **Build** | [fivem-resource-builder](https://github.com/matiaspalmac/fivem-resource-builder) | scaffold secure-by-default resources |
-| **Audit** | [fivem-security-audit](https://github.com/matiaspalmac/fivem-security-audit) | static review before deploy (CI gate) |
-| **Protect** | [dei_security_scanner](https://github.com/matiaspalmac/dei_security_scanner) | runtime detection + blocking in-server |
+It looks up real natives, framework exports and model hashes instead of guessing them.
 
-Build secure, audit the diff (0 CRITICAL to merge), deploy, and let the scanner catch anything injected later. The three share the same 2025-2026 threat intel and secure-pattern DNA. Generated code is designed to score 100 on the audit.
+Frameworks: ESX Legacy, QBCore, QBox (ox_core), ND_Core, ox_lib, standalone, and RedM (VORP, RSG, RedEM).
 
-## Frameworks
+## The toolkit
 
-ESX Legacy · QBCore · QBox (ox_core) · ND_Core · ox_lib helpers · Standalone · RedM (VORP / RSG / RedEM)
+Three tools, one workflow.
+
+| Stage | Tool |
+|-------|------|
+| Build | **fivem-resource-builder** |
+| Audit | [fivem-security-audit](https://github.com/matiaspalmac/fivem-security-audit) |
+| Protect | [dei_security_scanner](https://github.com/matiaspalmac/dei_security_scanner) |
+
+Build it secure, audit the diff before you deploy, run the scanner so anything injected later gets caught.
 
 ## License
 
-MIT — Dei
+MIT
