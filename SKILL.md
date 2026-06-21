@@ -71,7 +71,8 @@ After building, print:
 - The file tree created
 - The `server.cfg` line(s) to add (correct load order)
 - Any dependencies the user must install (oxmysql, ox_lib, framework)
-- A one-line reminder: "Run `/fivem-security-audit` to verify."
+- The **Dei FiveM toolkit** loop: `Run /fivem-security-audit to verify, and ensure dei_security_scanner on the server for runtime protection.`
+- Offer a CI quality gate (`templates/ci.md`) if the resource is in a git repo.
 
 ## Quality Bar
 

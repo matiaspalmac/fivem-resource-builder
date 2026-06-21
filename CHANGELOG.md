@@ -13,5 +13,9 @@ First release. Claude Code skill that scaffolds secure-by-default FiveM/RedM res
 - TypeScript / build pipeline template (esbuild/Vite, typed natives, NUI HMR) — optional
 - Pairs with fivem-security-audit — generated code is designed to score 100 on the audit
 
+### Suite integration
+- CI quality-gate template (`templates/ci.md`) — FiveM luacheck GitHub Action + `.luacheckrc` with Cfx globals.
+- Build output points to the **Dei FiveM Toolkit** loop: build → audit (`fivem-security-audit`) → protect (`dei_security_scanner`).
+
 ### Consolidated from the landscape
 Surveyed claude-fivem-dev, create-fivem-res, pe-cli, fivem-resource-maker and folded in their best ideas: dynamic native/doc fetching (claude-fivem-dev), TypeScript+build scaffolding and NUI HMR (create-fivem-res/pe-cli), ox-first patterns and asset discovery.

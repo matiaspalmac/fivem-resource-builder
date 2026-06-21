@@ -34,14 +34,15 @@ Fetches current natives from `docs.fivem.net`, framework APIs (ESX/QBCore/QBox/o
 ### Resource types
 shop / economy · job · garage · inventory · HUD / menu · minigame · admin
 
-## Pairs with fivem-security-audit
+## Dei FiveM Toolkit — build → audit → protect
 
-| | |
-|---|---|
-| `fivem-resource-builder` | **create** — scaffold secure resources |
-| `fivem-security-audit` | **verify** — audit before deploy |
+| Stage | Tool | Role |
+|-------|------|------|
+| **Build** | [fivem-resource-builder](https://github.com/matiaspalmac/fivem-resource-builder) | scaffold secure-by-default resources |
+| **Audit** | [fivem-security-audit](https://github.com/matiaspalmac/fivem-security-audit) | static review before deploy (CI gate) |
+| **Protect** | [dei_security_scanner](https://github.com/matiaspalmac/dei_security_scanner) | runtime detection + blocking in-server |
 
-Build with one, confirm with the other. Generated code is designed to score 100 on the audit.
+Build secure, audit the diff (0 CRITICAL to merge), deploy, and let the scanner catch anything injected later. The three share the same 2025-2026 threat intel and secure-pattern DNA. Generated code is designed to score 100 on the audit.
 
 ## Frameworks
 
