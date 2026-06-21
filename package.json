@@ -1,0 +1,46 @@
+{
+  "name": "fivem-resource-builder",
+  "version": "1.0.0",
+  "description": "Claude Code skill that scaffolds and builds complete, secure-by-default FiveM/RedM resources — fxmanifest, framework bridge (ESX, QBCore, QBox, ND_Core), server/client logic, NUI, and database wiring with validation, rate limiting, anti-dupe, and cleanup baked in. Pairs with fivem-security-audit. Optimized for Opus 4.8.",
+  "keywords": [
+    "fivem",
+    "fivem-resource-builder",
+    "fivem-scaffold",
+    "fivem-development",
+    "claude-code",
+    "claude-code-skill",
+    "claude-opus",
+    "esx",
+    "qbcore",
+    "qbox",
+    "ox-lib",
+    "nd-core",
+    "redm",
+    "lua",
+    "fivem-resource",
+    "scaffolding",
+    "gta5",
+    "rdr3",
+    "nui"
+  ],
+  "author": "Dei",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matiaspalmac/fivem-resource-builder.git"
+  },
+  "homepage": "https://github.com/matiaspalmac/fivem-resource-builder#readme",
+  "bugs": {
+    "url": "https://github.com/matiaspalmac/fivem-resource-builder/issues"
+  },
+  "bin": {
+    "fivem-resource-builder": "bin/install.js"
+  },
+  "files": [
+    "bin/",
+    "SKILL.md",
+    "templates/",
+    "LICENSE",
+    "README.md"
+  ]
+}
