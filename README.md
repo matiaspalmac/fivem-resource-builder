@@ -25,6 +25,11 @@ Generates full resources where security is the template, not an afterthought. Ev
 - **Server logic** — secure event skeletons, parameterized DB, ACE permissions
 - **Client logic** — two-tier threads, native caching, full `onResourceStop`
 - **NUI** — `textContent` XSS-safe, intent-only callbacks, CSP, `IS_BROWSER` preview
+- **ox ecosystem** — `lib.callback`, `ox_target`, `ox_inventory` hooks, `lib.points`, `lib.addCommand`, `lib.locale`
+- **TypeScript option** — esbuild/Vite build, typed natives, HMR for NUI
+
+### Live reference lookup (no guessing)
+Fetches current natives from `docs.fivem.net`, framework APIs (ESX/QBCore/QBox/ox), and model/prop hashes (PlebMasters Forge) instead of hallucinating signatures. Uses Context7 for library docs.
 
 ### Resource types
 shop / economy · job · garage · inventory · HUD / menu · minigame · admin

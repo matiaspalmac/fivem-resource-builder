@@ -4,7 +4,7 @@ description: "Scaffolds and builds complete, production-ready FiveM/RedM resourc
 argument-hint: "[resource-name] [esx|qb|qbox|nd|standalone]"
 arguments: [name, framework]
 effort: max
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(ls *), Bash(mkdir *)
+allowed-tools: Read, Write, Edit, Grep, Glob, WebFetch, Bash(ls *), Bash(mkdir *)
 license: MIT
 metadata:
   author: Dei
@@ -49,7 +49,21 @@ Never generate insecure code. Every server event you write already has: `local s
 
 ## Framework Support
 
-Generate a bridge that auto-detects and supports **ESX Legacy**, **QBCore**, **QBox (ox_core)**, **ND_Core**, and **standalone**. On RedM (`game 'rdr3'`) target **VORP / RSG / RedEM**. Prefer `ox_lib` helpers (`lib.callback`, `lib.cache`, `lib.notify`, `lib.zones`) when ox_lib is present.
+Generate a bridge that auto-detects and supports **ESX Legacy**, **QBCore**, **QBox (ox_core)**, **ND_Core**, and **standalone**. On RedM (`game 'rdr3'`) target **VORP / RSG / RedEM**. Prefer `ox_lib` helpers (`lib.callback`, `lib.cache`, `lib.notify`, `lib.zones`) when ox_lib is present — see `templates/ox.md`.
+
+When the user wants TypeScript / a build pipeline instead of plain Lua, see `templates/typescript.md`.
+
+## Reference Lookup (do NOT guess)
+
+Never invent a native signature, framework export, or model hash. When unsure, look it up before writing:
+
+- **Natives** (gta5 / rdr3): fetch from `https://docs.fivem.net/natives/` — confirm exact name, params, return, and game support.
+- **Framework APIs**: ESX (`https://docs.esx-framework.org`), QBCore (`https://docs.qbcore.org`), QBox (`https://coxdocs.dev`), ox_lib / ox_inventory / ox_target (`https://coxdocs.dev`).
+- **Libraries** (npm, NUI frameworks): prefer Context7 for current docs over memory.
+- **Assets** (props, vehicles, peds, weapons, hashes): PlebMasters Forge (`https://forge.plebmasters.de`) or the natives DB.
+- **RedM natives**: VORPCORE/RDR3natives DB, not the GTA5 set.
+
+Use the compile-time hash literal for models where possible: `RequestModel(\`adder\`)` (zero runtime overhead). State which source you confirmed a native against if it is non-obvious.
 
 ## Output
 
